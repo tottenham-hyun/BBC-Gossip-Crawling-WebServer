@@ -2,7 +2,8 @@ import User from '../models/User'
 import {NextFunction, Request, Response} from 'express'
 import passport from 'passport'
 import {generateRandomNumber, sendEmail} from '../middleware/mailer'
-
+import bcrypt from 'bcryptjs'
+const saltRounds = 10
 
 // 회원 가입
 export const userSignup = async (req: Request, res:Response):Promise<any>=>{
@@ -71,9 +72,31 @@ export const userUnsubscribe = async (req: Request, res: Response)=>{
     res.send('구독 취소')
 }
 
+// 회원 정보 수정
+export const userModifyInfo = async (req: Request, res : Response):Promise<any>=>{
+    const id = req.params.id
+
+    // 클라이언트에서 비밀번호 보내기 x but postman 같은걸로 수정 온다면?
+    // 요청에 password가 있으면 무시하기
+    if(req.body.password){
+        return res.send('못 바꿔요')
+    }
+
+    try{
+        const updatedUser = await User.findByIdAndUpdate(id, req.body, {new : true})
+
+        if(!updatedUser){
+            res.send('유저 없어요')
+        }
+        res.send(updatedUser)
+    } catch(err){
+        res.send(err)
+    }
+}
+
 let verificationCode : string;
-// 회원 탈퇴를 위한 메일 발송
-export const sendWithdrawMail = async (req: Request, res: Response):Promise<any> => {
+// 비밀번호 & 회원 탈퇴를 위한 메일 발송
+export const sendCode = async (req: Request, res: Response):Promise<any> => {
     const id = req.params.id
     try{
         const user = await User.findById(id)
@@ -89,9 +112,29 @@ export const sendWithdrawMail = async (req: Request, res: Response):Promise<any>
     } 
 }
 
+// 비밀번호 변경 (비밀번호와 인증코드를 같이 보냄)
+export const changePassword = async (req: Request, res : Response) => {
+    const {code, password} = req.body
+    const id = req.params.id
+
+    if(code === verificationCode){
+        // 비밀번호 암호화 코드 작성
+        const salt = await bcrypt.genSalt(saltRounds)
+        const hash = await bcrypt.hash(password, salt)
+
+        const updatedUser = await User.findByIdAndUpdate(id, {password : hash},{new:true})
+
+        if(!updatedUser){
+            return res.send('유저 없음')
+        }
+        res.send(updatedUser)
+    } else {
+        return res.send('옳지 않은 코드입니다.')
+    }
+}
+
 // 탈퇴
 export const userWithdraw = async (req: Request, res: Response) : Promise<any>=>{
-    console.log(verificationCode)
     const code = req.body.code
     const id = req.params.id
 
