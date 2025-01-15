@@ -6,11 +6,16 @@ import userRouter from './routes/userRouter'
 import passport from 'passport';
 import cookieSession from 'cookie-session'
 import dotenv from 'dotenv'
+import http from 'http'
+import {Server} from 'socket.io'
 
 dotenv.config()
 const app : Express = express();
 const port = 3000;
 const cookieEncryptionKey = "supersecret-key"
+const server = http.createServer(app)
+const io = new Server(server)
+
 
 // 미들웨어 
 app.use(cookieSession({
@@ -49,6 +54,6 @@ mongoose.connect(process.env.DB_URI as string)
     .catch((err)=> console.log(err))
 
 // 서버 시작
-app.listen(port, ()=>{
+server.listen(port, ()=>{
     console.log('서버 시작')
 })
