@@ -1,19 +1,6 @@
 import Article from '../models/Article'
 import {Request, Response} from 'express'
 
-// 전부 다 가져오기
-// export const getAllArticle = (req:Request,res:Response)=>{
-//     Article.find({})
-//     .then(data => {
-//         res.send(data)
-//     })
-//     .catch(err => {
-//         console.log(err)
-//         res.status(503).send('실패')
-//     })
-// }
-
-
 // 페이징
 export const getPageArticle = async (req : Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1 // 기본 시작 페이지는 1
