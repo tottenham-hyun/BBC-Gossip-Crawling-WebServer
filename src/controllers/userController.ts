@@ -1,7 +1,7 @@
 import User from '../models/User'
 import {NextFunction, Request, Response} from 'express'
 import passport from 'passport'
-import {generateRandomNumber, sendEmail} from '../middleware/mailer'
+import {isCodeValid, sendEmail, storeVerificationCode} from '../middleware/mailer'
 import bcrypt from 'bcryptjs'
 const saltRounds = 10
 
@@ -94,56 +94,81 @@ export const userModifyInfo = async (req: Request, res : Response):Promise<any>=
     }
 }
 
-let verificationCode : string;
 // 비밀번호 & 회원 탈퇴를 위한 메일 발송
-export const sendCode = async (req: Request, res: Response):Promise<any> => {
-    const id = req.params.id
-    try{
-        const user = await User.findById(id)
-        if(!user){
-            return res.send('user를 찾을 수 없습니다')
+export const sendCode = async (req: Request, res: Response): Promise<any> => {
+    const id = req.params.id;
+
+    try {
+        const user = await User.findById(id);
+        if (!user) {
+            return res.send('user를 찾을 수 없습니다');
         }
 
-        verificationCode = generateRandomNumber() // 인증 코드 생성
-        sendEmail(user.email, verificationCode) // 메일 발송
-        res.send('메일 전송 성공')
-    }catch(err){
-        console.log(err)
-    } 
-}
+        // id와 함께 인증 코드 생성 및 저장
+        const code = storeVerificationCode(id);
+        sendEmail(user.email, code); // 메일 발송
+        res.send('메일 전송 성공');
+    } catch (err) {
+        console.log(err);
+        res.send('메일 전송 실패');
+    }
+};
 
 // 비밀번호 변경 (비밀번호와 인증코드를 같이 보냄)
-export const changePassword = async (req: Request, res : Response) => {
-    const {code, password} = req.body
-    const id = req.params.id
+export const userChangePassword = async (req: Request, res: Response): Promise<any> => {
+    const { code, oldPassword, newPassword } = req.body;
+    const id = req.params.id;
 
-    if(code === verificationCode){
-        // 비밀번호 암호화 코드 작성
-        const salt = await bcrypt.genSalt(saltRounds)
-        const hash = await bcrypt.hash(password, salt)
-
-        const updatedUser = await User.findByIdAndUpdate(id, {password : hash},{new:true})
-
-        if(!updatedUser){
-            return res.send('유저 없음')
+    try{
+        //사용자 찾기
+        const user = await User.findById(id);
+        
+        if(!user){
+            return res.send('유저를 찾을 수 없습니다')
         }
-        res.send(updatedUser)
-    } else {
-        return res.send('옳지 않은 코드입니다.')
+
+        if (!isCodeValid(id, code)) {
+            return res.send('옳지 않은 코드이거나 코드가 만료되었습니다.');
+        }
+
+        user.comparePassword(oldPassword, async(err,isMatch)=>{
+            if(err){
+                return res.send('비밀번호 비교 오류')
+            }
+            if(!isMatch){
+                return res.send('비밀번호가 일치하지 않습니다.')
+            }
+
+            //새 비밀번호 암호화
+            const salt = await bcrypt.genSalt(10);
+            const hash = await bcrypt.hash(newPassword, salt);
+        
+            // 새 비밀번호로 업데이트
+            user.password = hash
+            await user.save()
+            res.send('비밀번호가 성공적으로 변경되었습니다.')
+        })
+    }catch(err){
+        console.log(err)
+        res.send('서버 오류')
     }
-}
+};
 
 // 탈퇴
-export const userWithdraw = async (req: Request, res: Response) : Promise<any>=>{
-    const code = req.body.code
-    const id = req.params.id
+export const userWithdraw = async (req: Request, res: Response): Promise<any> => {
+    const { code } = req.body;
+    const id = req.params.id;
 
-    if(code === verificationCode){
-        await User.findByIdAndDelete(id)
-            .then(()=>{return res.send('탈퇴 성공')})
-            .catch((err)=>{return res.send(err)})
-    } else{
-        return res.send('옳지 않은 코드입니다.')
+    if (!isCodeValid(id, code)) {
+        return res.send('옳지 않은 코드이거나 코드가 만료되었습니다.');
     }
-}
+
+    try {
+        await User.findByIdAndDelete(id);
+        res.send('탈퇴 성공');
+    } catch (err) {
+        console.log(err);
+        res.send('회원 탈퇴 실패');
+    }
+};
 
