@@ -1,0 +1,102 @@
+<!-- 소켓 테스트용 코드-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.io Chat</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #chat-container { max-width: 600px; margin: 0 auto; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
+        #messages div { margin-bottom: 5px; }
+        input { padding: 10px; margin: 5px 0; }
+        button { padding: 10px; background: #007BFF; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h1>Socket.io Chat</h1>
+        <div id="join-form">
+            <input type="text" id="nickname" placeholder="Enter your nickname" required>
+            <input type="text" id="room" placeholder="Enter room name" required>
+            <button id="join-btn">Join Chat</button>
+        </div>
+        <div id="chat-room" style="display: none;">
+            <h2 id="room-name"></h2>
+            <div id="messages"></div>
+            <input type="text" id="message" placeholder="Enter your message">
+            <button id="send-btn">Send</button>
+            <button id="leave-btn">Leave Room</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        const joinForm = document.getElementById('join-form');
+        const chatRoom = document.getElementById('chat-room');
+        const nicknameInput = document.getElementById('nickname');
+        const roomInput = document.getElementById('room');
+        const messagesDiv = document.getElementById('messages');
+        const roomName = document.getElementById('room-name');
+        const messageInput = document.getElementById('message');
+
+        const joinBtn = document.getElementById('join-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const leaveBtn = document.getElementById('leave-btn');
+
+        let nickname = '';
+        let room = '';
+
+        joinBtn.addEventListener('click', () => {
+            nickname = nicknameInput.value.trim();
+            room = roomInput.value.trim();
+
+            if (nickname && room) {
+                socket.emit('joinRoom', room, nickname);
+                joinForm.style.display = 'none';
+                chatRoom.style.display = 'block';
+                roomName.textContent = `Room: ${room}`;
+            }
+        });
+
+        sendBtn.addEventListener('click', () => {
+            const msg = messageInput.value.trim();
+            if (msg) {
+                socket.emit('chatMessage', room, nickname, msg);
+                messageInput.value = '';
+            }
+        });
+
+        leaveBtn.addEventListener('click', () => {
+            socket.emit('endChat', room, nickname);
+            chatRoom.style.display = 'none';
+            joinForm.style.display = 'block';
+            messagesDiv.innerHTML = '';
+        });
+
+        socket.on('chatMessage', ({ nickName, msg }) => {
+            const messageElement = document.createElement('div');
+            messageElement.textContent = `${nickName}: ${msg}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        socket.on('endChat', (message) => {
+            const messageElement = document.createElement('div');
+            messageElement.style.color = 'red';
+            messageElement.textContent = message;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        socket.on('errorMessage', (errMsg) => {
+            alert(errMsg);
+        });
+    </script>
+</body>
+</html>
