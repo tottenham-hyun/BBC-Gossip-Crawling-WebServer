@@ -1,3 +1,4 @@
+import { initializeSocket } from './socket/socketIndex';
 import express, {Express} from 'express';
 import path from 'path';
 import mongoose from 'mongoose';
@@ -7,15 +8,25 @@ import passport from 'passport';
 import cookieSession from 'cookie-session'
 import dotenv from 'dotenv'
 import http from 'http'
-import {Server} from 'socket.io'
+import { Request, Response } from 'express';
 
 dotenv.config()
 const app : Express = express();
 const port = 3000;
 const cookieEncryptionKey = "supersecret-key"
-const server = http.createServer(app)
-const io = new Server(server)
 
+// http 서버 생성
+const server = http.createServer(app)
+
+// socket.io 초기화
+initializeSocket(server)
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+app.get('/',(req:Request,res:Response)=>{
+    res.render('index')
+})
 
 // 미들웨어 
 app.use(cookieSession({
